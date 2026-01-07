@@ -5,5 +5,5 @@ requests
 python-dotenv
 pinecone
 groq
-pytubefix
+yt-dlp
 streamlit
