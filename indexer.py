@@ -1,50 +1,48 @@
 import os
+import glob
 import tempfile
+import yt_dlp  # <--- NEW LIBRARY
 from pinecone import Pinecone
 from groq import Groq
-from pytubefix import YouTube 
 
+# --- CLIENT SETUP ---
 groq_client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
 pc = Pinecone(api_key=os.environ.get("PINECONE_API_KEY"))
 index = pc.Index("videodb")
 
+# --- HELPER: MAP-REDUCE SUMMARY ---
 def generate_smart_summary(full_text):
     """
     Summarizes text of ANY length using Map-Reduce.
-    1. If short: Summarize directly.
-    2. If long: Split -> Summarize chunks -> Combine -> Final Summary.
     """
     CHUNK_SIZE = 20000  
     
     # CASE A: Short Video 
     if len(full_text) < CHUNK_SIZE:
-        #print(" Text is short. Summarizing directly...")
-        prompt = f"Summarize this video transcript in detail make sure to not leave anything from the transcript\n{full_text}"
+        print("⚡ Text is short. Summarizing directly...")
+        prompt = f"Summarize this video transcript in detail:\n{full_text}"
         res = groq_client.chat.completions.create(
             messages=[{"role": "user", "content": prompt}],
-            model="meta-llama/llama-4-scout-17b-16e-instruct"
+            model="llama-3.3-70b-versatile"
         )
         return res.choices[0].message.content
 
     # CASE B: Long Video 
-    #print(f" Text is long ({len(full_text)} chars). Using Map-Reduce...")
+    print(f"📚 Text is long ({len(full_text)} chars). Using Map-Reduce...")
     
-    # 1. MAP: Chunk the text
     chunks = [full_text[i:i+CHUNK_SIZE] for i in range(0, len(full_text), CHUNK_SIZE)]
     partial_summaries = []
     
-    # 2. SUMMARIZE EACH CHUNK
     for i, chunk in enumerate(chunks):
-        #print(f"   - Summarizing part {i+1}/{len(chunks)}...")
-        prompt = f"Summarize this segment of a video transcript in detail make sure to not leave anything:\n{chunk}"
+        print(f"   - Summarizing part {i+1}/{len(chunks)}...")
+        prompt = f"Summarize this segment of a video transcript in detail:\n{chunk}"
         res = groq_client.chat.completions.create(
             messages=[{"role": "user", "content": prompt}],
-            model="meta-llama/llama-4-scout-17b-16e-instruct"
+            model="llama-3.3-70b-versatile"
         )
         partial_summaries.append(res.choices[0].message.content)
 
-    # 3. REDUCE: Combine partial summaries into one Master Summary
-    #print("   - Combining summaries...")
+    print("   - Combining summaries...")
     combined_text = " ".join(partial_summaries)
     
     final_prompt = f"""
@@ -57,46 +55,79 @@ def generate_smart_summary(full_text):
     
     final_res = groq_client.chat.completions.create(
         messages=[{"role": "user", "content": final_prompt}],
-        model="meta-llama/llama-4-scout-17b-16e-instruct"
+        model="llama-3.3-70b-versatile"
     )
     
     return final_res.choices[0].message.content
 
+# --- MAIN PROCESS FUNCTION ---
 def process_video(youtube_url):
-    #print(f"Processing: {youtube_url}")
+    print(f"🎬 Processing: {youtube_url}")
     
-    # DOWNLOAD & TRANSCRIBE
+    video_title = "Unknown Video"
+    video_id = "unknown_id"
+    transcription = None
+    
+    # --- STEP 1: DOWNLOAD WITH YT-DLP (The Fix) ---
     with tempfile.TemporaryDirectory() as temp_dir:
-        yt = YouTube(youtube_url, client='WEB')
-        stream = yt.streams.filter(only_audio=True).first()
-        downloaded_path = stream.download(output_path=temp_dir)
-        
-        with open(downloaded_path, "rb") as file:
-            transcription = groq_client.audio.transcriptions.create(
-                file=(downloaded_path, file.read()),
-                model="whisper-large-v3-turbo",
-                response_format="verbose_json", 
-            )
+        # 1. Configure yt-dlp to behave like a Browser
+        ydl_opts = {
+            'format': 'bestaudio/best',      # Best audio available
+            'outtmpl': f'{temp_dir}/%(id)s.%(ext)s', # Save to temp folder with ID name
+            'quiet': True,
+            'noplaylist': True,
+            'postprocessors': [],            # Disable FFmpeg (Prevents crashes on Render)
+        }
 
-    # GENERATE SUMMARY
-    #print(" Generating Summary...")
+        # 2. Check for Cookies (Optional "Nuclear" Bypass)
+        # If you upload cookies.txt to your repo, this code will find and use it.
+        if os.path.exists("cookies.txt"):
+            print("🍪 Found cookies.txt! Using it for authentication.")
+            ydl_opts['cookiefile'] = "cookies.txt"
+
+        try:
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                # Extract Info & Download
+                print("⬇️ Downloading with yt-dlp...")
+                info = ydl.extract_info(youtube_url, download=True)
+                
+                video_title = info.get('title', 'Unknown')
+                video_id = info.get('id')
+                
+                # Find the file (Extension might be webm, m4a, opus...)
+                # We search the temp directory for any file starting with the video_id
+                downloaded_file = glob.glob(f"{temp_dir}/{video_id}.*")[0]
+                print(f"✅ Downloaded: {downloaded_file}")
+                
+                # --- STEP 2: TRANSCRIBE ---
+                print("👂 Transcribing...")
+                with open(downloaded_file, "rb") as file:
+                    transcription = groq_client.audio.transcriptions.create(
+                        file=(downloaded_file, file.read()),
+                        model="whisper-large-v3-turbo",
+                        response_format="verbose_json", 
+                    )
+
+        except Exception as e:
+            print(f"❌ Download/Transcription Error: {e}")
+            return None, None
+
+    # --- STEP 3: GENERATE SUMMARY ---
+    print("📝 Generating Summary...")
     full_text = " ".join([s['text'] for s in transcription.segments])
     
     try:
-        # Call our new smart helper function
         ai_summary = generate_smart_summary(full_text)
-        #print(f" Final Summary Generated ({len(ai_summary)} chars)")
+        print(f"✅ Summary Generated ({len(ai_summary)} chars)")
     except Exception as e:
-        #print(f"⚠️ Summary failed: {e}")
+        print(f"⚠️ Summary failed: {e}")
         ai_summary = "Summary unavailable."
 
-    # --- 3. PREPARE RECORDS (Summary + Chunks) ---
+    # --- STEP 4: PREPARE RECORDS ---
     print("🧠 Preparing records...")
     records = []
-    video_id = yt.video_id 
     
-    # A. Add the "Super Chunk" (The Summary)
-    # We give it a hardcoded ID "global_summary" so we can find it easily later.
+    # A. Summary Card
     records.append({
         "id": "global_summary", 
         "text": ai_summary,
@@ -106,7 +137,7 @@ def process_video(youtube_url):
         "title": "SUMMARY_CARD"
     })
 
-    # B. Add the Regular Chunks
+    # B. Video Chunks
     current_text = ""
     chunk_start = 0.0
     
@@ -120,19 +151,18 @@ def process_video(youtube_url):
             
         if len(current_text) + len(text) >= 1000:
             records.append({
-                "id": f"{video_id}_{len(records)}", # Unique ID
+                "id": f"{video_id}_{len(records)}", 
                 "text": current_text.strip(),
                 "start_time": chunk_start,
                 "end_time": end,
                 "url": youtube_url,
-                "title": yt.title
+                "title": video_title
             })
             current_text = ""
             chunk_start = start 
         
         current_text += " " + text
     
-    # Add leftover chunk
     if current_text:
         records.append({
             "id": f"{video_id}_{len(records)}",
@@ -140,16 +170,15 @@ def process_video(youtube_url):
             "start_time": chunk_start,
             "end_time": transcription.segments[-1]['end'],
             "url": youtube_url,
-            "title": yt.title
+            "title": video_title
         })
 
-    # --- 4. UPLOAD EVERYTHING TO ONE NAMESPACE ---
+    # --- STEP 5: UPLOAD ---
     try:
-        # This saves BOTH the summary and the chunks into the 'video_id' folder
         index.upsert_records(namespace=video_id, records=records)
-        #print(f"🎉 SUCCESS! Saved {len(records)} records to namespace '{video_id}'")
-        return video_id, yt.title
+        print(f"🎉 SUCCESS! Saved {len(records)} records.")
+        return video_id, video_title
         
     except Exception as e:
-        #print(f"❌ Error uploading: {e}")
+        print(f"❌ Upload Error: {e}")
         return None, None
