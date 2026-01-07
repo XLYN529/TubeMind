@@ -92,7 +92,13 @@ def process_video(youtube_url):
             'outtmpl': f'{temp_dir}/%(id)s.%(ext)s', 
             'quiet': True,
             'noplaylist': True,
-            'postprocessors': [],            
+            'postprocessors': [],
+            extractor_args': {
+                'youtube': {
+                    'player_client': ['web', 'mweb'],
+                    'skip': ['dash', 'hls'] 
+                }
+            }
         }
         
 
