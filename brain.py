@@ -29,22 +29,25 @@ def get_answer(question, video_id):
     # We search specifically for the summary card we created in the indexer.
     global_context = "Summary not available."
     try:
-        # We use search_records with a filter because it's more reliable 
-        # than 'fetch' when using the Inference API's schema.
-        summary_hit = index.search_records(
-            namespace=video_id,
-            query={"inputs": {"text": "summary"}, "top_k": 1},
-            filter={"title": "SUMMARY_CARD"}, # <--- Finds the special summary card
-            fields=["text"]
-        )
+        # Instead of searching, we FETCH the specific ID we saved.
+        # This is faster and avoids the "filter" error.
+        fetch_response = index.fetch(ids=["global_summary"], namespace=video_id)
         
-        hits = summary_hit.get('result', {}).get('hits', [])
-        if hits:
-            global_context = hits[0]['fields'].get('text', "")
-           # print("✅ Global Context Loaded.")
+        # Pinecone fetch returns a dictionary like {'vectors': {'global_summary': {...}}}
+        if fetch_response and 'vectors' in fetch_response and 'global_summary' in fetch_response['vectors']:
+            # Depending on your SDK version, metadata might be in 'metadata' or 'fields'
+            data = fetch_response['vectors']['global_summary']
+            # Try 'metadata' first (standard), then 'fields' (inference API)
+            meta = data.get('metadata') or data.get('fields')
+            
+            if meta:
+                global_context = meta.get('text', "")
+                print("✅ Global Context Loaded.")
+        else:
+            print("⚠️ No Global Context found (Old video?).")
 
     except Exception as e:
-        print(f" Error fetching summary: {e}")
+        print(f"⚠️ Error fetching summary: {e}")
 
     # --- STEP 2: SEARCH FOR SPECIFIC DETAILS ---
     try:
