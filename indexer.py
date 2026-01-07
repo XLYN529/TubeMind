@@ -83,12 +83,18 @@ def process_video(youtube_url):
 
         # 1. Configure yt-dlp
         ydl_opts = {
-            'format': 'bestaudio[abr<50]/worstaudio',      
+            'format': 'bestaudio',   
+            'format_sort': [
+                '+size',      # 1. Pick the smallest file first
+                '+abr',       # 2. If sizes are equal, pick lowest bitrate
+                'acodec:opus' # 3. Prefer Opus (best efficiency for small files)
+            ],
             'outtmpl': f'{temp_dir}/%(id)s.%(ext)s', 
             'quiet': True,
             'noplaylist': True,
             'postprocessors': [],            
         }
+        
 
         # 2. Tell yt-dlp to use the file we just created
         if os.path.exists("cookies.txt"):
