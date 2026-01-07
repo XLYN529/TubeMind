@@ -4,8 +4,6 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# IMPORT CHANGE: We now use the combined cloud_indexer script
-# Ensure your script is named 'cloud_indexer.py' or adjust this import!
 from indexer import process_video 
 from brain import get_answer
 
@@ -30,7 +28,7 @@ async def process_video_endpoint(item: URLRequest):
             "status": "success", 
             "message": "Video processed!",
             "video_id": video_id,
-            "video_title": video_title # <--- SENDING THIS TO FRONTEND
+            "video_title": video_title 
         }
         
     except Exception as e:

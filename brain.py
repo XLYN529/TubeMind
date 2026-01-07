@@ -5,7 +5,6 @@ from groq import Groq
 
 load_dotenv()
 
-# --- SETUP CLIENTS ---
 pc = Pinecone(api_key=os.environ.get("PINECONE_API_KEY"))
 index = pc.Index("videodb")
 client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
@@ -24,7 +23,7 @@ def get_answer(question, video_id):
     1. Fetches 'Global Context' (Summary) for high-level understanding.
     2. Searches 'Specific Chunks' for detailed answers.
     """
-    print(f"🤔 Brain searching inside Namespace: {video_id}...")
+    #print(f"🤔 Brain searching inside Namespace: {video_id}...")
 
     # --- STEP 1: FETCH GLOBAL CONTEXT (The Summary) ---
     # We search specifically for the summary card we created in the indexer.
@@ -42,18 +41,16 @@ def get_answer(question, video_id):
         hits = summary_hit.get('result', {}).get('hits', [])
         if hits:
             global_context = hits[0]['fields'].get('text', "")
-            print("✅ Global Context Loaded.")
-        else:
-            print("⚠️ No Global Context found (Old video?).")
+           # print("✅ Global Context Loaded.")
 
     except Exception as e:
-        print(f"⚠️ Error fetching summary: {e}")
+        print(f" Error fetching summary: {e}")
 
     # --- STEP 2: SEARCH FOR SPECIFIC DETAILS ---
     try:
         results = index.search_records(
-            namespace=video_id, # <--- IMPORTANT: Search only this video's folder
-            query={"inputs": {"text": question}, "top_k": 5}, # top_k=5 is usually enough
+            namespace=video_id,
+            query={"inputs": {"text": question}, "top_k": 5}, 
             fields=["text", "start_time", "end_time"]
         )
     except Exception as e:
@@ -109,7 +106,7 @@ def get_answer(question, video_id):
         return chat_completion.choices[0].message.content
         
     except Exception as e:
-        return f"❌ LLM Error: {e}"
+        return f" LLM Error: {e}"
 
 # --- TEST AREA ---
 if __name__ == "__main__":
