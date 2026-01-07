@@ -39,6 +39,6 @@ async def ask_question_endpoint(item: QuestionRequest):
     answer = get_answer(item.question, item.video_id)
     return {"answer": answer} 
 
-@api.get("/")
+@api.api_route("/", methods=["GET", "HEAD"])
 def home():
     return {"message": "TubeMind API is alive"}
