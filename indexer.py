@@ -83,7 +83,7 @@ def process_video(youtube_url):
 
         # 1. Configure yt-dlp
         ydl_opts = {
-            'format': 'bestaudio/best',      
+            'format': 'bestaudio[abr<50]/worstaudio',      
             'outtmpl': f'{temp_dir}/%(id)s.%(ext)s', 
             'quiet': True,
             'noplaylist': True,
