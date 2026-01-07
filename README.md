@@ -1,6 +1,3 @@
-Here is a professional, comprehensive `README.md` for your project. You can copy-paste this directly into your GitHub repository.
-
----
 
 #  TubeMind: The AI Video Tutor
 
