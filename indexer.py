@@ -68,21 +68,31 @@ def process_video(youtube_url):
     video_id = "unknown_id"
     transcription = None
     
-    # --- STEP 1: DOWNLOAD WITH YT-DLP (The Fix) ---
+    # --- STEP 1: DOWNLOAD WITH YT-DLP ---
     with tempfile.TemporaryDirectory() as temp_dir:
-        # 1. Configure yt-dlp to behave like a Browser
+        
+        # =========================================================
+        # 🛡️ SECURITY FIX: RECONSTRUCT COOKIES FROM ENV VARIABLE
+        # This allows you to keep the repo PUBLIC but cookies PRIVATE
+        # =========================================================
+        if os.environ.get("YOUTUBE_COOKIES"):
+            print("🍪 Found YOUTUBE_COOKIES env var. Creating cookies.txt...")
+            with open("cookies.txt", "w") as f:
+                f.write(os.environ.get("YOUTUBE_COOKIES"))
+        # =========================================================
+
+        # 1. Configure yt-dlp
         ydl_opts = {
-            'format': 'bestaudio/best',      # Best audio available
-            'outtmpl': f'{temp_dir}/%(id)s.%(ext)s', # Save to temp folder with ID name
+            'format': 'bestaudio/best',      
+            'outtmpl': f'{temp_dir}/%(id)s.%(ext)s', 
             'quiet': True,
             'noplaylist': True,
-            'postprocessors': [],            # Disable FFmpeg (Prevents crashes on Render)
+            'postprocessors': [],            
         }
 
-        # 2. Check for Cookies (Optional "Nuclear" Bypass)
-        # If you upload cookies.txt to your repo, this code will find and use it.
+        # 2. Tell yt-dlp to use the file we just created
         if os.path.exists("cookies.txt"):
-            print("🍪 Found cookies.txt! Using it for authentication.")
+            print("🍪 Using cookies.txt for authentication.")
             ydl_opts['cookiefile'] = "cookies.txt"
 
         try:
@@ -95,7 +105,6 @@ def process_video(youtube_url):
                 video_id = info.get('id')
                 
                 # Find the file (Extension might be webm, m4a, opus...)
-                # We search the temp directory for any file starting with the video_id
                 downloaded_file = glob.glob(f"{temp_dir}/{video_id}.*")[0]
                 print(f"✅ Downloaded: {downloaded_file}")
                 
