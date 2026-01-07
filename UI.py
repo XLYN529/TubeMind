@@ -27,46 +27,39 @@ if "url_input" not in st.session_state:
 # This function runs BEFORE the page reloads. 
 # It handles the logic without crashing the widget state.
 def process_video_callback():
-    # Get the URL directly from the state
     url = st.session_state.url_input
-    
-    if not url:
-        st.error("Please enter a URL")
-        return
-
-    # We use a placeholder for status messages inside the sidebar
-    status_msg = st.sidebar.empty() 
-    status_msg.info(" Processing... please wait.")
+    if not url: return
 
     try:
         response = requests.post(f"{API_URL}/process", json={"url": url})
         
+        # 1. Check HTTP Status
         if response.status_code == 200:
             data = response.json()
-            new_id = data.get("video_id")
-            new_title = data.get("video_title")
             
-            # Switch to new video
-            st.session_state.video_id = new_id
-            st.session_state.chat_history = [] 
-            
-            # Add to Library
-            if not any(v['id'] == new_id for v in st.session_state.video_library):
+            # 2. CHECK LOGICAL STATUS (The Fix)
+            if data.get("status") == "success":
+                new_id = data.get("video_id")
+                new_title = data.get("video_title")
+                
+                st.session_state.video_id = new_id
                 st.session_state.video_library.append({
                     "id": new_id, 
                     "title": new_title
                 })
-            
-            status_msg.success(" Done!")
-            
-            # THE MAGIC FIX:
-            # We clear the input HERE, inside the callback.
-            # Since this runs BEFORE the text_input widget is drawn again, it works perfectly.
-            st.session_state.url_input = "" 
-            
+                st.session_state.url_input = "" 
+                st.success(f"Loaded: {new_title}")
+                
+            else:
+                # Show the REAL error from the backend
+                error_msg = data.get("message", "Unknown Error")
+                st.error(f"❌ Server Error: {error_msg}")
+                
         else:
-            status_msg.error(f" Error: {response.text}")
-
+            st.error(f"❌ HTTP Error: {response.text}")
+            
+    except Exception as e:
+        st.error(f"❌ Connection Error: {e}")
     except Exception as e:
         status_msg.error(f" Connection Error: {e}")
 
