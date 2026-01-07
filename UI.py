@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 st.set_page_config(page_title="TubeMind")
-st.title("TubeMind 🧠")
+st.title("TubeMind")
 
 API_URL = os.getenv("API_URL", "http://127.0.0.1:8000")
 
@@ -147,4 +147,4 @@ if st.session_state.video_id:
             st.session_state.chat_archives[st.session_state.video_id] = st.session_state.chat_history
 
 else:
-    st.info("👈 Paste a URL to start a temporary session.")
+    st.info(" Paste a URL to start a temporary session.")
