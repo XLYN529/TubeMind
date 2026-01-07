@@ -3,7 +3,7 @@ uvicorn
 pydantic
 requests
 python-dotenv
-pinecone-client
+pinecone
 groq
 pytubefix
 streamlit
