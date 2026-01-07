@@ -67,7 +67,7 @@ def process_video(youtube_url):
     
     # DOWNLOAD & TRANSCRIBE
     with tempfile.TemporaryDirectory() as temp_dir:
-        yt = YouTube(youtube_url)
+        yt = YouTube(youtube_url, client='WEB')
         stream = yt.streams.filter(only_audio=True).first()
         downloaded_path = stream.download(output_path=temp_dir)
         
