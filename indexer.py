@@ -93,7 +93,7 @@ def process_video(youtube_url):
             'quiet': True,
             'noplaylist': True,
             'postprocessors': [],
-            extractor_args': {
+            'extractor_args': {
                 'youtube': {
                     'player_client': ['web', 'mweb'],
                     'skip': ['dash', 'hls'] 
