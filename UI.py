@@ -1,10 +1,14 @@
 import streamlit as st
 import requests
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 st.set_page_config(page_title="TubeMind")
 st.title("TubeMind ")
 
-API_URL = "http://127.0.0.1:8000"
+API_URL = os.getenv("API_URL","http://127.0.0.1:8000")
 
 # --- 1. SESSION STATE ---
 if "video_id" not in st.session_state:
