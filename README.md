@@ -1,67 +1,67 @@
+# TubeMind
 
-#  TubeMind: The AI Video Tutor
+TubeMind is an AI-powered retrieval application that transforms YouTube videos into interactive knowledge bases. It allows users to query video content through a chat interface, providing answers grounded in specific timestamps and transcripts.
 
-**Turn any YouTube video into an interactive learning session.**
+The system utilizes a Retrieval-Augmented Generation (RAG) pipeline to download audio, generate accurate transcripts, index content into a vector database, and synthesize answers using Large Language Models (LLMs). It is designed to run completely in the cloud, utilizing a split frontend/backend architecture.
 
-TubeMind is an AI-powered RAG (Retrieval-Augmented Generation) application that allows users to chat with YouTube videos. It downloads audio, generates transcripts, indexes content into a vector database, and uses LLMs to answer questions with precise timestamped citations.
+## Features
 
----
+* **Robust Video Ingestion:** Utilizes `yt-dlp` for industry-standard video extraction, supporting secure cookie-based authentication to bypass bot detection limits on cloud servers.
+* **Global Context Awareness:** Implements a Map-Reduce summarization strategy. The system summarizes the video in chunks and combines them into a master summary, allowing the AI to answer high-level questions ("What is the main argument?") as well as specific details.
+* **Persistent Chat Archives:** Users can process multiple videos in a single session. The application maintains separate chat histories for each video, allowing users to switch contexts seamlessly without losing progress.
+* **Hybrid Search:** Retrieves answers by combining the "Global Summary" (for context) with specific vector search results (for precision), ensuring comprehensive answers.
+* **Namespace Isolation:** Video data is stored in isolated namespaces within the vector database, preventing data leakage between different video contexts.
 
-##  Features
+## Technical Architecture
 
-*  Universal Video Support:** Works with any public YouTube URL.
-*  Instant Transcription:** Uses Groq's Whisper-large-v3 for lightning-fast, accurate audio-to-text conversion.
-*  "Global Context" Engine:** Automatically generates a comprehensive summary of the entire video using a Map-Reduce strategy, ensuring the AI understands the "big picture" alongside specific details.
-*  Hybrid Search:** Combines semantic vector search (Pinecone) with global context injection to answer both specific ("What did he say at 5:00?") and overarching ("What is the main topic?") questions.
-*  Ephemeral Sessions:** No login required. Chat history and processed videos live in your browser session and vanish when you close the tab for privacy and speed.
-*  Namespace Isolation:** Every video is stored in its own isolated namespace, preventing data overlap between users or videos.
+The application operates on a split-stack design to ensure scalability and security:
 
----
-
-## 🛠️ Tech Stack
-
-* **Frontend:** [Streamlit](https://streamlit.io/) (Python-based UI)
-* **Backend API:** [FastAPI](https://fastapi.tiangolo.com/)
-* **Vector Database:** [Pinecone](https://www.pinecone.io/) (Serverless Inference)
-* **LLM & Transcription:** [Groq](https://groq.com/) (Llama-3-70b & Whisper-large-v3)
-* **Video Processing:** [pytubefix](https://github.com/JuanBindez/pytubefix)
-* **Deployment:** Render (Backend) + Streamlit Cloud (Frontend)
-
----
-
-## 🏗️ Architecture
-
-The app follows a split-architecture design:
-
-1. **Streamlit Frontend:** Handles user inputs and session state (history). Sends JSON requests to the API.
-2. **FastAPI Backend:** Acts as the traffic controller.
-3. **Cloud Indexer (Worker):**
-* Downloads audio via `pytubefix`.
-* Transcribes via Groq Whisper.
-* Generates a summary via Map-Reduce (Llama-3).
-* Chunks text and uploads to Pinecone.
+1. **Frontend (Streamlit):**
+* Manages user session state and chat archives.
+* Communicates with the backend via RESTful API calls.
+* Displays real-time processing feedback.
 
 
-4. **The Brain (Worker):**
-* Fetches the summary card + specific chunks from Pinecone.
-* Constructs a hybrid prompt.
-* Returns the AI answer with timestamps.
+2. **Backend (FastAPI):**
+* Acts as the central orchestrator for data flow.
+* Exposes endpoints for video processing, querying, and memory management.
+
+
+3. **Ingestion Worker (Cloud Indexer):**
+* **Download:** Extracts audio using `yt-dlp`. If the server IP is flagged, it automatically reconstructs authentication cookies from environment variables.
+* **Compression:** Checks file size against API limits. If necessary, converts audio to Mono/16kHz/32k bitrate to reduce size by ~90%.
+* **Transcription:** Uses Groq's Whisper-large-v3 for transcription.
+* **Indexing:** Vectors are generated and stored in Pinecone.
+
+
+4. **Inference Engine (The Brain):**
+* Fetches the "Summary Card" directly by ID for context.
+* Performs semantic search for specific segments.
+* Synthesizes the final response using Llama-3-70b.
 
 
 
----
+## Tech Stack
 
-## 📦 Installation & Setup
+* **Frontend:** Streamlit
+* **Backend:** FastAPI, Uvicorn
+* **Vector Database:** Pinecone
+* **LLM & Speech-to-Text:** Groq (Llama-3, Whisper-large-v3)
+* **Video Extraction:** yt-dlp
+* **Deployment:** Render (Backend), Streamlit Cloud (Frontend)
+
+## Installation & Setup
 
 ### Prerequisites
 
 * Python 3.9+
 * API Keys for **Groq** and **Pinecone**
+* (Optional) A `cookies.txt` file from YouTube for cloud authentication
 
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/XLYN529/TubeMind.git
+git clone https://github.com/YourUsername/TubeMind.git
 cd tubemind
 
 ```
@@ -78,32 +78,48 @@ pip install -r requirements.txt
 Create a `.env` file in the root directory:
 
 ```ini
-GROQ_API_KEY=gsk_your_groq_key_here
-PINECONE_API_KEY=pcsk_your_pinecone_key_here
+GROQ_API_KEY=gsk_your_groq_key...
+PINECONE_API_KEY=pcsk_your_pinecone_key...
+API_URL=http://127.0.0.1:8000
 
 ```
 
----
+### 4. Running Locally
 
+**Start the Backend:**
 
-## 📂 Project Structure
+```bash
+uvicorn API:api --reload
+
+```
+
+**Start the Frontend:**
+
+```bash
+streamlit run UI.py
+
+```
+
+## Cloud Deployment (Render & Streamlit)
+
+For production deployment, the application requires specific configuration to handle YouTube's bot detection:
+
+1. **Authentication:** To bypass YouTube 403/Bot errors, export your YouTube cookies to Netscape format. Copy the content of the file and save it as an environment variable named `YOUTUBE_COOKIES` on the Render dashboard. The application will automatically reconstruct the file at runtime.
+2. **Frontend (Streamlit Cloud):** Deploy `UI.py` and set the `API_URL` secret to point to your Render backend URL.
+
+## Project Structure
 
 ```text
 /tubemind
-├── API.py             # FastAPI entry point (The Manager)
-├── brain.py           # RAG Logic: Search & Answer generation (The Thinker)
-├── indexer.py         # Ingestion Logic: Download -> Transcribe -> Index (The Worker)
-├── UI.py              # Streamlit UI & Session Management
-├── requirements.txt   # Python dependencies
-└── .env              
+├── API.py              # FastAPI entry point
+├── brain.py            # RAG Logic: Search & Answer generation
+├── indexer.py    # Ingestion: Download (yt-dlp) -> Compress -> Index
+├── UI.py         # Streamlit UI & Archive Management
+├── requirements.txt    # Dependencies
+└── .gitignore          # Security exclusions (cookies.txt, .env)
 
 ```
 
-
-## 🤝 Contributing
-
-Pull requests are welcome! For major changes, please open an issue first to discuss what you would like to change.
-
-## 📄 License
+## License
 
 [MIT](https://choosealicense.com/licenses/mit/)
