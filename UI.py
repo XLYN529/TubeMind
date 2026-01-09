@@ -33,7 +33,9 @@ def process_video_callback():
     if not url: return
 
     try:
-        response = requests.post(f"{API_URL}/process", json={"url": url})
+        msg = "Processing video... Please wait. If the video is long, this might take a minute."
+        with st.spinner(msg):
+             response = requests.post(f"{API_URL}/process", json={"url": url})
         
         # 1. Check HTTP Status
         if response.status_code == 200:
@@ -74,6 +76,7 @@ def process_video_callback():
 
 # --- 3. SIDEBAR (The View) ---
 with st.sidebar:
+    st.info("Videos longer than 2 hours cannot be processed at this time")
     st.header("Add New Video")
     
     st.text_input("YouTube URL", key="url_input")
